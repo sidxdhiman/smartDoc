@@ -1,0 +1,55 @@
+/* DocumentEditor.css */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  .document-editor-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+  }
+  
+  .editor-container {
+    width: 48%;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+  }
+  
+  .editor-title h2 {
+    font-size: 1.6rem;
+    margin-bottom: 15px;
+  }
+  
+  .quill-editor {
+    height: 500px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+  }
+  
+  .preview-container {
+    width: 48%;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+  }
+  
+  .preview-title h2 {
+    font-size: 1.6rem;
+    margin-bottom: 15px;
+  }
+  
+  .preview-content {
+    padding: 15px;
+    background-color: #f1f1f1;
+    min-height: 500px;
+    border-radius: 8px;
+  }
+  
