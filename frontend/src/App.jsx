@@ -22,11 +22,11 @@ export const Navbar = () => (
             className="h-max w-10 border-r-2 mr-2 pr-2 border-black"
             alt="National Emblem"
           />
-             <img
-              src="/icon.png"
-              className="h-max w-14  mr-2 pr-2"
-              alt="Smartdoc logo"
-            />
+          <img
+            src="/icon.png"
+            className="h-max w-14  mr-2 pr-2"
+            alt="Smartdoc logo"
+          />
           <span className="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">
             SmartDoc
           </span>
@@ -73,12 +73,13 @@ const HeroSection = () => (
           transition={{ duration: 0.8 }}
         >
           <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 mb-8 leading-tight">
-            Securely access and verify documents <br/>
-            <span className="text-blue-600">Anytime</span><span className="text-blue-600">,</span> {" "}
+            Securely access and verify documents <br />
+            <span className="text-blue-600">Anytime</span>
+            <span className="text-blue-600">,</span>{" "}
             <span className="text-blue-600">Anywhere</span>
           </h1>
           <p className="text-xl text-gray-600 mb-10">
-          All in one Comprehensive document issuing and verification portal.
+            All in one Comprehensive document issuing and verification portal.
           </p>
           <div className="flex space-x-6">
             <Link to="/login">
@@ -87,17 +88,19 @@ const HeroSection = () => (
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-               Login
+                Login
                 <ArrowRight className="ml-2 h-5 w-5" />
               </motion.button>
-            </Link><Link to="/signup">
-            <motion.button
-              className="border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg hover:bg-blue-50 transition duration-300 text-lg"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Sign Up
-            </motion.button></Link>
+            </Link>
+            <Link to="/signup">
+              <motion.button
+                className="border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg hover:bg-blue-50 transition duration-300 text-lg"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Sign Up
+              </motion.button>
+            </Link>
           </div>
         </motion.div>
         <motion.div
@@ -196,7 +199,7 @@ const FeaturesSection = () => (
               Military-grade encryption and security protocols to protect your
               sensitive documents.
             </p>
-          </div> 
+          </div>
         </motion.div> */}
       </div>
     </div>
@@ -275,10 +278,7 @@ const DocumentTypesSection = () => (
         </p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {[
-          "ID Cards",
-          "Birth Certificates",
-        ].map((doc, index) => (
+        {["ID Cards", "Birth Certificates"].map((doc, index) => (
           <motion.div
             key={index}
             className="bg-white p-4 rounded-lg shadow-md text-center"

@@ -1,6 +1,17 @@
-import { useState } from "react";
-import { FaUser, FaLock, FaEnvelope, FaKey, FaPhone } from "react-icons/fa";
+import React, { useState } from "react";
+// Added FaSpinner for loading state
+import {
+  FaUser,
+  FaLock,
+  FaEnvelope,
+  FaKey,
+  FaPhone,
+  FaSpinner,
+} from "react-icons/fa";
 import { Link } from "react-router-dom";
+
+// IMPORTANT: Define the backend URL for API calls
+const API_BASE_URL = "http://localhost:5000/api";
 
 const Navbar = () => {
   return (
@@ -31,6 +42,73 @@ const Navbar = () => {
 const Login = () => {
   const [role, setRole] = useState("individual");
 
+  // --- State for form inputs, loading, and errors ---
+  const [formData, setFormData] = useState({ phone: "", pin: "" });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // --- Handle input changes ---
+  const handleInputChange = (e) => {
+    const { id, value } = e.target;
+    setFormData((prev) => ({ ...prev, [id]: value }));
+    setError("");
+    setSuccess("");
+  };
+
+  // --- Handle form submission ---
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+    setSuccess("");
+
+    if (role !== "individual") {
+      setError(`API integration not available for ${role} role.`);
+      setIsLoading(false);
+      return;
+    }
+
+    // Map frontend fields (phone/pin) to backend fields (email/password)
+    const payload = {
+      email: formData.phone, // Value from "phone" input
+      password: formData.pin, // Value from "pin" input
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `Login failed.`);
+      }
+
+      // --- SUCCESSFUL LOGIN ACTION ---
+      const userDetails = {
+        name: data.user.name,
+        email: data.user.email,
+        token: data.token,
+      };
+      localStorage.setItem("smartdoc_user", JSON.stringify(userDetails));
+
+      setSuccess(`Login successful! Redirecting to dashboard...`);
+
+      // Redirect to the Dashboard path
+      window.location.href = "/individual";
+    } catch (err) {
+      setError(
+        err.message || "Network error. Please check the API server connection.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Render inputs based on role
   const renderInputs = () => {
     switch (role) {
@@ -49,9 +127,12 @@ const Login = () => {
                 <FaPhone className="text-gray-500 mr-2" />
                 <input
                   id="phone"
-                  type="tel"
+                  type="tel" // Kept as "tel" as per your UI
+                  value={formData.phone}
+                  onChange={handleInputChange}
                   className="w-full focus:outline-none"
                   placeholder="Enter your phone number"
+                  required
                 />
               </div>
             </div>
@@ -67,8 +148,11 @@ const Login = () => {
                 <input
                   id="pin"
                   type="password"
+                  value={formData.pin}
+                  onChange={handleInputChange}
                   className="w-full focus:outline-none"
                   placeholder="Enter your PIN code"
+                  required
                 />
               </div>
             </div>
@@ -77,7 +161,7 @@ const Login = () => {
       case "issuer":
         return (
           <>
-              <Navbar />
+            <Navbar />
             <div className="mb-4">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
@@ -134,7 +218,7 @@ const Login = () => {
       case "verifier":
         return (
           <>
-              <Navbar />
+            <Navbar />
             <div className="mb-4">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
@@ -217,21 +301,43 @@ const Login = () => {
             <option value="verifier">Verifying Authority</option>
           </select>
         </div>
-        <form>
+
+        {/* Status Messages */}
+        {success && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            {success}
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Form now calls the submit handler */}
+        <form onSubmit={handleAuthSubmit}>
           {renderInputs()}
           <div className="flex items-center justify-between">
-            <Link
-              to={`/${role}`}
-              className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            {/* Changed from Link to Button to allow form submission */}
+            <button
+              type="submit"
+              className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center"
+              disabled={isLoading}
             >
-              Log In
-            </Link>
+              {isLoading ? (
+                <>
+                  <FaSpinner className="animate-spin mr-2" /> Logging In...
+                </>
+              ) : (
+                "Log In"
+              )}
+            </button>
           </div>
         </form>
         <div className="text-center mt-4">
           <p className="text-sm text-gray-600">
-            Don't have an account?{" "}
-            <a href="#" className="text-blue-500 hover:underline">
+            Don't have an account? {/* Link to /signup is preserved */}
+            <a href="/signup" className="text-blue-500 hover:underline">
               Sign up
             </a>
           </p>

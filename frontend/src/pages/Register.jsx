@@ -1,6 +1,18 @@
 import React, { useState } from "react";
-import { FaUser, FaLock, FaEnvelope, FaKey, FaPhone, FaIdCard } from "react-icons/fa";
+import {
+  FaUser,
+  FaLock,
+  FaEnvelope,
+  FaKey,
+  FaPhone,
+  FaIdCard,
+  FaSpinner,
+  FaUserPlus,
+} from "react-icons/fa";
 import { Link } from "react-router-dom";
+
+// IMPORTANT: Define the backend URL
+const API_BASE_URL = "http://localhost:5000/api";
 
 const Navbar = () => {
   return (
@@ -30,45 +42,161 @@ const Navbar = () => {
 
 const SignUp = () => {
   const [role, setRole] = useState("individual");
+  const [isLoading, setIsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
   const [formData, setFormData] = useState({
     individual: {
+      name: "",
+      email: "",
+      pin: "", // Changed from password
+      confirmPin: "", // Changed from confirmPassword
       phone: "",
-      pin: "",
-      confirmPin: ""
+      aadhaar: "",
     },
     issuer: {
       issuerId: "",
       name: "",
       email: "",
       password: "",
-      confirmPassword: ""
+      confirmPassword: "",
     },
     verifier: {
       verifierId: "",
       name: "",
       email: "",
       password: "",
-      confirmPassword: ""
-    }
+      confirmPassword: "",
+    },
   });
 
   const handleInputChange = (e, roleType) => {
     const { id, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [roleType]: {
         ...prev[roleType],
-        [id]: value
-      }
+        [id]: value,
+      },
     }));
+    // Clear status messages on input change
+    setSuccessMessage("");
+    setErrorMessage("");
+  };
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setSuccessMessage("");
+    setErrorMessage("");
+    setIsLoading(true);
+
+    const data = formData[role];
+    const isIndividual = role === "individual";
+
+    // --- 1. Client-Side Validation ---
+    if (isIndividual && data.pin !== data.confirmPin) {
+      setErrorMessage("PINs do not match.");
+      setIsLoading(false);
+      return;
+    }
+    if (
+      isIndividual &&
+      (!data.email ||
+        !data.pin || // Check for pin
+        !data.name ||
+        !data.phone ||
+        !data.aadhaar)
+    ) {
+      setErrorMessage("All fields are required for individual signup.");
+      setIsLoading(false);
+      return;
+    }
+
+    // --- 2. Prepare Payload ---
+    const payload = isIndividual
+      ? {
+          name: data.name,
+          email: data.email,
+          password: data.pin, // Map 'pin' state to 'password' field for the backend
+          phone: data.phone,
+          aadhaar: data.aadhaar,
+        }
+      : null; // Only handle individual role for API submission
+
+    if (!payload) {
+      setErrorMessage("API integration only available for Individual role.");
+      setIsLoading(false);
+      return;
+    }
+
+    // --- 3. API Submission ---
+    try {
+      const response = await fetch(`${API_BASE_URL}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Signup failed due to server error.");
+      }
+
+      setSuccessMessage(
+        `Registration successful! Welcome, ${result.user.name}. Please proceed to login.`,
+      );
+
+      // Optionally clear the form here
+      setFormData((prev) => ({
+        ...prev,
+        individual: {
+          name: "",
+          email: "",
+          pin: "",
+          confirmPin: "",
+          phone: "",
+          aadhaar: "",
+        },
+      }));
+    } catch (err) {
+      setErrorMessage(
+        err.message || "Network error. Could not connect to the server.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const renderInputs = () => {
     switch (role) {
       case "individual":
+        // Collects all fields required by your backend
         return (
           <>
-            <Navbar />
+            <div className="mb-4">
+              <label
+                className="block text-gray-700 text-sm font-bold mb-2"
+                htmlFor="name"
+              >
+                Full Name
+              </label>
+              <div className="flex items-center border rounded-lg px-3 py-2">
+                <FaUser className="text-gray-500 mr-2" />
+                <input
+                  id="name"
+                  type="text"
+                  value={formData.individual.name}
+                  onChange={(e) => handleInputChange(e, "individual")}
+                  className="w-full focus:outline-none"
+                  placeholder="Enter your full name"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* --- MOVED UP --- */}
             <div className="mb-4">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
@@ -85,9 +213,33 @@ const SignUp = () => {
                   onChange={(e) => handleInputChange(e, "individual")}
                   className="w-full focus:outline-none"
                   placeholder="Enter your phone number"
+                  required
                 />
               </div>
             </div>
+
+            <div className="mb-4">
+              <label
+                className="block text-gray-700 text-sm font-bold mb-2"
+                htmlFor="email"
+              >
+                Email Address
+              </label>
+              <div className="flex items-center border rounded-lg px-3 py-2">
+                <FaEnvelope className="text-gray-500 mr-2" />
+                <input
+                  id="email"
+                  type="email"
+                  value={formData.individual.email}
+                  onChange={(e) => handleInputChange(e, "individual")}
+                  className="w-full focus:outline-none"
+                  placeholder="Enter your email address"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* --- CHANGED TO PIN --- */}
             <div className="mb-4">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
@@ -103,10 +255,13 @@ const SignUp = () => {
                   value={formData.individual.pin}
                   onChange={(e) => handleInputChange(e, "individual")}
                   className="w-full focus:outline-none"
-                  placeholder="Create your PIN code"
+                  placeholder="Create a password"
+                  required
                 />
               </div>
             </div>
+
+            {/* --- CHANGED TO PIN --- */}
             <div className="mb-6">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
@@ -122,16 +277,38 @@ const SignUp = () => {
                   value={formData.individual.confirmPin}
                   onChange={(e) => handleInputChange(e, "individual")}
                   className="w-full focus:outline-none"
-                  placeholder="Confirm your PIN code"
+                  placeholder="Confirm your password"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label
+                className="block text-gray-700 text-sm font-bold mb-2"
+                htmlFor="aadhaar"
+              >
+                Aadhaar ID
+              </label>
+              <div className="flex items-center border rounded-lg px-3 py-2">
+                <FaIdCard className="text-gray-500 mr-2" />
+                <input
+                  id="aadhaar"
+                  type="text"
+                  value={formData.individual.aadhaar}
+                  onChange={(e) => handleInputChange(e, "individual")}
+                  className="w-full focus:outline-none"
+                  placeholder="Enter your Aadhaar ID"
+                  required
                 />
               </div>
             </div>
           </>
         );
       case "issuer":
+        // Static UI preserved for Issuer
         return (
           <>
-            <Navbar />
             <div className="mb-4">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
@@ -230,9 +407,9 @@ const SignUp = () => {
           </>
         );
       case "verifier":
+        // Static UI preserved for Verifier
         return (
           <>
-            <Navbar />
             <div className="mb-4">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
@@ -335,15 +512,10 @@ const SignUp = () => {
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Implement validation logic here
-    console.log("Form submitted", formData[role]);
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md">
+      <Navbar />
+      <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md mt-20">
         <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
           Sign Up - Document Verification System
         </h2>
@@ -365,14 +537,36 @@ const SignUp = () => {
             <option value="verifier">Verifying Authority</option>
           </select>
         </div>
-        <form onSubmit={handleSubmit}>
+
+        {/* Status Messages */}
+        {successMessage && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            {successMessage}
+          </div>
+        )}
+        {errorMessage && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {errorMessage}
+          </div>
+        )}
+
+        <form onSubmit={handleAuthSubmit}>
           {renderInputs()}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mt-6">
             <button
               type="submit"
-              className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center"
+              disabled={isLoading}
             >
-              Sign Up
+              {isLoading ? (
+                <>
+                  <FaSpinner className="animate-spin mr-2" /> Registering...
+                </>
+              ) : (
+                <>
+                  <FaUserPlus className="mr-2" /> Sign Up
+                </>
+              )}
             </button>
           </div>
         </form>
