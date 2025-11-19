@@ -1,61 +1,57 @@
 import React from "react";
-import { Home, FileText, Search, HardDrive, Settings, User, LogOut } from "lucide-react";
+import { Home, FileText, Search, Settings, LogOut } from "lucide-react";
 
-const Sidebar = ({ selectedTab, setSelectedTab }) => {
-  const navigation = [
+// Assuming this component receives selectedTab, setSelectedTab, and handleLogout as props
+const Sidebar = ({ selectedTab, setSelectedTab, handleLogout }) => {
+  const navItems = [
     { name: "Home", icon: Home, tab: "home" },
-    { name: "Documents", icon: FileText, tab: "documents" },
+    { name: "My Documents", icon: FileText, tab: "documents" },
     { name: "Search", icon: Search, tab: "search" },
     { name: "Settings", icon: Settings, tab: "settings" },
   ];
 
   return (
-    <aside className="w-64 bg-indigo-700 text-white shadow-xl">
-      <div className="h-full flex flex-col py-8">
-        {/* Logo Section */}
-        <div className="px-6 mb-10">
-          <div className="flex items-center justify-center space-x-3">
-            <div className="h-12 w-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <img src="/icon.png" className="w-10 h-10 rounded-md" alt="Logo" />
-            </div>
-            <span className="text-2xl font-bold tracking-tight">SmartDoc</span>
-          </div>
-        </div>
-
-        {/* Navigation Section */}
-        <nav className="flex-1 px-4">
-          <div className="space-y-1">
-            {navigation.map((item) => (
-              <button
-                key={item.name}
-                onClick={() => setSelectedTab(item.tab)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                  selectedTab === item.tab
-                    ? "bg-indigo-600 text-white shadow-md"
-                    : "text-indigo-100 hover:bg-indigo-600/50 hover:text-white"
-                }`}
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="font-medium">{item.name}</span>
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        {/* Bottom Section */}
-        <div className="px-4 mt-6 space-y-1">
-          <div className="h-px bg-indigo-600/50 my-4" />
-          <button className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-indigo-100 hover:bg-indigo-600/50 hover:text-white">
-            <User className="h-5 w-5" />
-            <span className="font-medium">Profile</span>
-          </button>
-          <button className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-indigo-100 hover:bg-indigo-600/50 hover:text-white">
-            <LogOut className="h-5 w-5" />
-            <span className="font-medium">Logout</span>
-          </button>
-        </div>
+    <nav className="flex flex-col w-64 bg-indigo-700 text-white p-6 shadow-2xl">
+      {/* Logo/Title */}
+      <div className="text-3xl font-extrabold mb-10 text-indigo-200">
+        SmartDoc
       </div>
-    </aside>
+
+      {/* Navigation Links */}
+      <div className="flex-1 space-y-3">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = selectedTab === item.tab;
+          return (
+            <button
+              key={item.tab}
+              onClick={() => setSelectedTab(item.tab)}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium
+                                ${
+                                  isActive
+                                    ? "bg-indigo-600 text-white shadow-lg"
+                                    : "text-indigo-200 hover:bg-indigo-600/50 hover:text-white"
+                                }
+                            `}
+            >
+              <Icon className="h-5 w-5" />
+              <span>{item.name}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Logout Button (FIXED) */}
+      <div className="mt-8 pt-4 border-t border-indigo-600">
+        <button
+          onClick={handleLogout} // <-- The FIX: Adding the onClick handler
+          className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 text-indigo-100 bg-indigo-600/30 hover:bg-red-500 hover:text-white font-medium"
+        >
+          <LogOut className="h-5 w-5" />
+          <span>Logout</span>
+        </button>
+      </div>
+    </nav>
   );
 };
 

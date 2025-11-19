@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   FileText,
@@ -10,13 +10,14 @@ import {
   CheckCircle,
   ArrowRight,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // Added useNavigate
 
 export const Navbar = () => (
   <nav className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md shadow-lg z-50">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center h-20">
-        <div className="flex items-center">
+        {/* START: Updated to make the logo and name clickable to "/" */}
+        <Link to="/" className="flex items-center">
           <img
             src="https://img1.digitallocker.gov.in/assets/img/icons/National-Emblem.png"
             className="h-max w-10 border-r-2 mr-2 pr-2 border-black"
@@ -24,13 +25,14 @@ export const Navbar = () => (
           />
           <img
             src="/icon.png"
-            className="h-max w-14  mr-2 pr-2"
+            className="h-max w-14 mr-2 pr-2"
             alt="Smartdoc logo"
           />
           <span className="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">
             SmartDoc
           </span>
-        </div>
+        </Link>
+        {/* END: Updated to make the logo and name clickable to "/" */}
 
         <div className="hidden md:flex items-center space-x-10">
           <a
@@ -184,23 +186,7 @@ const FeaturesSection = () => (
           title="Blockchain Storage"
           description="Immutable and secure document storage using advanced blockchain technology for ultimate security."
         />
-        {/* <motion.div className="relative" whileHover={{ scale: 1.05 }}>
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl transform rotate-1"></div>
-           <div className="relative bg-white p-8 rounded-2xl shadow-lg">
-            <img
-              src="/placeholder.svg?height=200&width=400"
-              alt="Security Features"
-              className="rounded-lg mb-6"
-            />
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">
-              Enterprise Security
-            </h3>
-            <p className="text-gray-600 leading-relaxed">
-              Military-grade encryption and security protocols to protect your
-              sensitive documents.
-            </p>
-          </div>
-        </motion.div> */}
+        {/* ... (commented out card) */}
       </div>
     </div>
   </div>
@@ -218,11 +204,7 @@ const UserTypeCard = ({ icon: Icon, title, description, image }) => (
     >
       <Icon className="h-10 w-10 text-blue-600" />
     </motion.div>
-    {/* <img
-      src={image}
-      alt={title}
-      className="w-full h-40 object-cover rounded-xl mb-6"
-    /> */}
+    {/* ... (commented out image) */}
     <h3 className="text-2xl font-semibold text-gray-900 mb-4">{title}</h3>
     <p className="text-gray-600 leading-relaxed">{description}</p>
   </motion.div>
@@ -322,15 +304,37 @@ const CallToAction = () => (
   </div>
 );
 
-const HomePage = () => (
-  <div className="min-h-screen">
-    <Navbar />
-    <HeroSection />
-    <FeaturesSection />
-    <UsersSection />
-    <DocumentTypesSection />
-    <CallToAction />
-  </div>
-);
+// START: Updated HomePage with Redirection Logic
+const HomePage = () => {
+  const navigate = useNavigate();
+
+  // FIX: Setting isLoggedIn to true to demonstrate the redirect.
+  // **REPLACE THIS LINE** with your actual authentication check.
+  const [isLoggedIn] = useState(true);
+
+  useEffect(() => {
+    const authToken = localStorage.getItem("authToken");
+    const userIsAuthenticated = !!authToken;
+
+    // This ONLY redirects if logged in (to /individual).
+    // If not logged in, it DOES NOT redirect (it shows the home page).
+    if (userIsAuthenticated) {
+      navigate("/individual", { replace: true });
+    }
+  }, [navigate]);
+
+  // If not logged in, render the main landing page
+  return (
+    <div className="min-h-screen">
+      <Navbar />
+      <HeroSection />
+      <FeaturesSection />
+      <UsersSection />
+      <DocumentTypesSection />
+      <CallToAction />
+    </div>
+  );
+};
+// END: Fixed HomePage with Redirection Logic
 
 export default HomePage;
