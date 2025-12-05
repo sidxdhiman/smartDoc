@@ -5,7 +5,6 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose"; // Import Mongoose
-// import connectDB from "./utils/connectDB.js"; // We will connect directly
 import verifyRoute from "./routes/verify.js";
 import requestRoute from "./routes/request.js";
 import issueRoute from "./routes/issue.js";
@@ -40,31 +39,34 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 
-// 5. Middleware
+// --- 5. Core Middleware (All grouped together before routes) ---
 app.use(cors(corsOptions));
-app.use(express.json()); // Body parser for JSON
 
-// 6. Connect to the database
-// We removed the old connectDB() call from here.
+// ESSENTIAL FIX: Body parser for JSON must run BEFORE any routes
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Robustness for form data
 
-// 7. Routes
+// Simple logger middleware (moved to ensure it runs before routes)
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  // Log the body received, which should now be populated by express.json()
+  // console.log("REQ BODY:", req.body);
+  next();
+});
+// ------------------------------------------------------------------
+
+// 6. Routes
 app.use("/api", requestRoute);
 app.use("/api", issueRoute);
 app.use("/api", verifyRoute);
 app.use("/api", authRoute); // Ensure auth routes are used
 
-// 8. Simple logger middleware
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
-});
-
-// 9. Optional: Add a general catch-all for root URL
+// 7. Optional: Add a general catch-all for root URL
 app.get("/", (req, res) => {
   res.send("SmartDoc Backend API is running.");
 });
 
-// 10. --- NEW: Connect to DB THEN Start Server ---
+// 8. --- Connect to DB THEN Start Server ---
 const startServer = async () => {
   try {
     // 1. Connect to MongoDB
@@ -82,5 +84,5 @@ const startServer = async () => {
   }
 };
 
-// 11. Run the server
+// 9. Run the server
 startServer();

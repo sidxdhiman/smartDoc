@@ -1,13 +1,6 @@
 import React, { useState } from "react";
-// Added FaSpinner for loading state
-import {
-  FaUser,
-  FaLock,
-  FaEnvelope,
-  FaKey,
-  FaPhone,
-  FaSpinner,
-} from "react-icons/fa";
+// Replaced react-icons/fa with lucide-react icons
+import { User, Lock, Mail, Key, Phone, Loader } from "lucide-react";
 import { Link } from "react-router-dom";
 
 // IMPORTANT: Define the backend URL for API calls
@@ -42,8 +35,16 @@ const Navbar = () => {
 const Login = () => {
   const [role, setRole] = useState("individual");
 
-  // --- State for form inputs, loading, and errors ---
-  const [formData, setFormData] = useState({ phone: "", pin: "" });
+  // State to hold dynamic input values
+  const [formData, setFormData] = useState({
+    individual_identifier: "",
+    individual_password: "",
+    issuer_identifier: "",
+    issuer_password: "",
+    verifier_identifier: "",
+    verifier_password: "",
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -63,16 +64,31 @@ const Login = () => {
     setError("");
     setSuccess("");
 
-    if (role !== "individual") {
-      setError(`API integration not available for ${role} role.`);
+    let loginInput;
+    let password;
+
+    // Determine which fields to use based on the selected role
+    if (role === "individual") {
+      loginInput = formData.individual_identifier;
+      password = formData.individual_password;
+    } else if (role === "issuer") {
+      loginInput = formData.issuer_identifier;
+      password = formData.issuer_password;
+    } else if (role === "verifier") {
+      loginInput = formData.verifier_identifier;
+      password = formData.verifier_password;
+    }
+
+    if (!loginInput || !password) {
+      setError("Please enter both the identifier and password/PIN.");
       setIsLoading(false);
       return;
     }
 
-    // Map frontend fields (phone/pin) to backend fields (email/password)
+    // Map frontend fields to the backend structure (email/password)
     const payload = {
-      email: formData.phone, // Value from "phone" input
-      password: formData.pin, // Value from "pin" input
+      email: loginInput, // Backend expects identifier (phone/issuerId/verifierId) in 'email' field
+      password: password, // Backend expects password/PIN in 'password' field
     };
 
     try {
@@ -93,13 +109,20 @@ const Login = () => {
         name: data.user.name,
         email: data.user.email,
         token: data.token,
+        role: data.user.role, // Assuming the backend returns the role now
       };
       localStorage.setItem("smartdoc_user", JSON.stringify(userDetails));
 
       setSuccess(`Login successful! Redirecting to dashboard...`);
 
-      // Redirect to the Dashboard path
-      window.location.href = "/individual";
+      // Determine redirection based on the actual logged-in user's role
+      if (userDetails.role === "issuer") {
+        window.location.href = "/Issuer";
+      } else if (userDetails.role === "verifier") {
+        window.location.href = "/verifier-dashboard"; // Example path for verifier
+      } else {
+        window.location.href = "/individual";
+      }
     } catch (err) {
       setError(
         err.message || "Network error. Please check the API server connection.",
@@ -115,23 +138,22 @@ const Login = () => {
       case "individual":
         return (
           <>
-            <Navbar />
             <div className="mb-4">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="phone"
+                htmlFor="individual_identifier"
               >
-                Phone Number
+                Phone Number / Email
               </label>
               <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaPhone className="text-gray-500 mr-2" />
+                <Phone className="text-gray-500 mr-2 h-5 w-5" />
                 <input
-                  id="phone"
-                  type="tel" // Kept as "tel" as per your UI
-                  value={formData.phone}
+                  id="individual_identifier"
+                  type="text"
+                  value={formData.individual_identifier}
                   onChange={handleInputChange}
                   className="w-full focus:outline-none"
-                  placeholder="Enter your phone number"
+                  placeholder="Phone Number or Email"
                   required
                 />
               </div>
@@ -139,16 +161,16 @@ const Login = () => {
             <div className="mb-6">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="pin"
+                htmlFor="individual_password"
               >
                 PIN Code
               </label>
               <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaLock className="text-gray-500 mr-2" />
+                <Lock className="text-gray-500 mr-2 h-5 w-5" />
                 <input
-                  id="pin"
+                  id="individual_password"
                   type="password"
-                  value={formData.pin}
+                  value={formData.individual_password}
                   onChange={handleInputChange}
                   className="w-full focus:outline-none"
                   placeholder="Enter your PIN code"
@@ -161,55 +183,43 @@ const Login = () => {
       case "issuer":
         return (
           <>
-            <Navbar />
             <div className="mb-4">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="issuerId"
+                htmlFor="issuer_identifier"
               >
-                Issuer ID
+                Issuer ID / Email
               </label>
               <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaKey className="text-gray-500 mr-2" />
+                <Key className="text-gray-500 mr-2 h-5 w-5" />
                 <input
-                  id="issuerId"
+                  id="issuer_identifier"
                   type="text"
+                  value={formData.issuer_identifier}
+                  onChange={handleInputChange}
                   className="w-full focus:outline-none"
-                  placeholder="Enter your unique Issuer ID"
-                />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="name"
-              >
-                Name
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaUser className="text-gray-500 mr-2" />
-                <input
-                  id="name"
-                  type="text"
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your name"
+                  placeholder="Enter Issuer ID or Email"
+                  required
                 />
               </div>
             </div>
             <div className="mb-6">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="email"
+                htmlFor="issuer_password"
               >
-                Email
+                Password
               </label>
               <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaEnvelope className="text-gray-500 mr-2" />
+                <Lock className="text-gray-500 mr-2 h-5 w-5" />
                 <input
-                  id="email"
-                  type="email"
+                  id="issuer_password"
+                  type="password"
+                  value={formData.issuer_password}
+                  onChange={handleInputChange}
                   className="w-full focus:outline-none"
-                  placeholder="Enter your email"
+                  placeholder="Enter your password"
+                  required
                 />
               </div>
             </div>
@@ -218,55 +228,43 @@ const Login = () => {
       case "verifier":
         return (
           <>
-            <Navbar />
             <div className="mb-4">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="verifierId"
+                htmlFor="verifier_identifier"
               >
-                Verifier ID
+                Verifier ID / Email
               </label>
               <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaKey className="text-gray-500 mr-2" />
+                <Key className="text-gray-500 mr-2 h-5 w-5" />
                 <input
-                  id="verifierId"
+                  id="verifier_identifier"
                   type="text"
+                  value={formData.verifier_identifier}
+                  onChange={handleInputChange}
                   className="w-full focus:outline-none"
-                  placeholder="Enter your unique Verifier ID"
-                />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="name"
-              >
-                Name
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaUser className="text-gray-500 mr-2" />
-                <input
-                  id="name"
-                  type="text"
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your name"
+                  placeholder="Enter Verifier ID or Email"
+                  required
                 />
               </div>
             </div>
             <div className="mb-6">
               <label
                 className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="email"
+                htmlFor="verifier_password"
               >
-                Email
+                Password
               </label>
               <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaEnvelope className="text-gray-500 mr-2" />
+                <Lock className="text-gray-500 mr-2 h-5 w-5" />
                 <input
-                  id="email"
-                  type="email"
+                  id="verifier_password"
+                  type="password"
+                  value={formData.verifier_password}
+                  onChange={handleInputChange}
                   className="w-full focus:outline-none"
-                  placeholder="Enter your email"
+                  placeholder="Enter your password"
+                  required
                 />
               </div>
             </div>
@@ -279,7 +277,10 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md">
+      <Navbar />
+      {/* FIX: Centering achieved by using margin-top offset equivalent to navbar height (h-20)
+         and ensuring vertical centering using justify-center on the parent div. */}
+      <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md mt-20">
         <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
           Document Verification System
         </h2>
@@ -326,7 +327,7 @@ const Login = () => {
             >
               {isLoading ? (
                 <>
-                  <FaSpinner className="animate-spin mr-2" /> Logging In...
+                  <Loader className="animate-spin mr-2 h-5 w-5" /> Logging In...
                 </>
               ) : (
                 "Log In"

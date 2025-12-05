@@ -1,14 +1,17 @@
 import React, { useState } from "react";
+// Replaced react-icons/fa with lucide-react icons
 import {
-  FaUser,
-  FaLock,
-  FaEnvelope,
-  FaKey,
-  FaPhone,
-  FaIdCard,
-  FaSpinner,
-  FaUserPlus,
-} from "react-icons/fa";
+  User,
+  Lock,
+  Mail,
+  Key,
+  Phone,
+  CreditCard,
+  Loader,
+  UserPlus,
+  Building,
+  ShieldCheck,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 // IMPORTANT: Define the backend URL
@@ -73,11 +76,14 @@ const SignUp = () => {
 
   const handleInputChange = (e, roleType) => {
     const { id, value } = e.target;
+    // FIX: Automatically trim whitespace from inputs to prevent "empty field" errors
+    const trimmedValue = value.trimStart();
+
     setFormData((prev) => ({
       ...prev,
       [roleType]: {
         ...prev[roleType],
-        [id]: value,
+        [id]: trimmedValue,
       },
     }));
     // Clear status messages on input change
@@ -93,44 +99,81 @@ const SignUp = () => {
 
     const data = formData[role];
     const isIndividual = role === "individual";
+    const isIssuer = role === "issuer";
+    const isVerifier = role === "verifier";
 
-    // --- 1. Client-Side Validation ---
-    if (isIndividual && data.pin !== data.confirmPin) {
-      setErrorMessage("PINs do not match.");
+    let payload = {};
+    let requiredFields = [];
+    let passwordMatch = true;
+
+    // --- 1. Client-Side Validation and Payload Preparation ---
+
+    if (isIndividual) {
+      if (data.pin !== data.confirmPin) {
+        setErrorMessage("PINs do not match.");
+        passwordMatch = false;
+      }
+      payload = {
+        name: data.name,
+        email: data.email,
+        password: data.pin, // Map 'pin' state to 'password' field for the backend
+        phone: data.phone,
+        aadhaar: data.aadhaar,
+        role: "individual", // Explicitly define the role for the backend
+      };
+      // 'password' here refers to the mapped pin value in the payload for validation
+      requiredFields = ["name", "email", "password", "phone", "aadhaar"];
+    } else if (isIssuer) {
+      if (data.password !== data.confirmPassword) {
+        setErrorMessage("Passwords do not match.");
+        passwordMatch = false;
+      }
+      payload = {
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        issuerId: data.issuerId,
+        role: "issuer",
+      };
+      requiredFields = ["name", "email", "password", "issuerId"];
+    } else if (isVerifier) {
+      if (data.password !== data.confirmPassword) {
+        setErrorMessage("Passwords do not match.");
+        passwordMatch = false;
+      }
+      payload = {
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        verifierId: data.verifierId,
+        role: "verifier",
+      };
+      requiredFields = ["name", "email", "password", "verifierId"];
+    }
+
+    if (!passwordMatch) {
       setIsLoading(false);
       return;
     }
-    if (
-      isIndividual &&
-      (!data.email ||
-        !data.pin || // Check for pin
-        !data.name ||
-        !data.phone ||
-        !data.aadhaar)
-    ) {
-      setErrorMessage("All fields are required for individual signup.");
+
+    // Check for required fields
+    const missingField = requiredFields.find(
+      // Improved check: convert to string and trim final value to detect emptiness
+      (field) => !payload[field] || payload[field].toString().trim() === "",
+    );
+    if (missingField) {
+      // Improve error message clarity
+      const fieldName = missingField.replace(/([A-Z])/g, " $1").trim();
+      setErrorMessage(`Please fill out the required field: ${fieldName}.`);
       setIsLoading(false);
       return;
     }
 
-    // --- 2. Prepare Payload ---
-    const payload = isIndividual
-      ? {
-          name: data.name,
-          email: data.email,
-          password: data.pin, // Map 'pin' state to 'password' field for the backend
-          phone: data.phone,
-          aadhaar: data.aadhaar,
-        }
-      : null; // Only handle individual role for API submission
+    // --- DEBUGGING STEP ADDED ---
+    console.log("Submitting payload:", payload);
+    // --- DEBUGGING STEP ADDED ---
 
-    if (!payload) {
-      setErrorMessage("API integration only available for Individual role.");
-      setIsLoading(false);
-      return;
-    }
-
-    // --- 3. API Submission ---
+    // --- 2. API Submission ---
     try {
       const response = await fetch(`${API_BASE_URL}/signup`, {
         method: "POST",
@@ -141,24 +184,25 @@ const SignUp = () => {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || "Signup failed due to server error.");
+        // Log the full error response from the server for better diagnosis
+        console.error("Server Error Response:", result);
+        // If the backend returns an error message, use it.
+        throw new Error(
+          result.message ||
+            "Signup failed due to server error. Check console for details.",
+        );
       }
 
       setSuccessMessage(
-        `Registration successful! Welcome, ${result.user.name}. Please proceed to login.`,
+        `Registration for ${role} successful! Welcome, ${result.user.name}. Please proceed to login.`,
       );
 
-      // Optionally clear the form here
+      // Clear the form data for the submitted role
       setFormData((prev) => ({
         ...prev,
-        individual: {
-          name: "",
-          email: "",
-          pin: "",
-          confirmPin: "",
-          phone: "",
-          aadhaar: "",
-        },
+        [role]: Object.fromEntries(
+          Object.keys(prev[role]).map((key) => [key, ""]),
+        ),
       }));
     } catch (err) {
       setErrorMessage(
@@ -170,341 +214,87 @@ const SignUp = () => {
   };
 
   const renderInputs = () => {
+    const data = formData[role];
+    const roleType = role;
+
+    const createInput = (id, type, placeholder, Icon, isRequired = true) => (
+      <div className="mb-4">
+        <label
+          className="block text-gray-700 text-sm font-bold mb-2 capitalize"
+          htmlFor={id}
+        >
+          {placeholder.replace("Enter your ", "").replace("Create a ", "")}
+        </label>
+        <div className="flex items-center border rounded-lg px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-shadow">
+          <Icon className="text-gray-500 mr-2 h-5 w-5" />
+          <input
+            id={id}
+            type={type}
+            value={data[id]}
+            onChange={(e) => handleInputChange(e, roleType)}
+            className="w-full focus:outline-none"
+            placeholder={placeholder}
+            required={isRequired}
+          />
+        </div>
+      </div>
+    );
+
     switch (role) {
       case "individual":
-        // Collects all fields required by your backend
         return (
           <>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="name"
-              >
-                Full Name
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaUser className="text-gray-500 mr-2" />
-                <input
-                  id="name"
-                  type="text"
-                  value={formData.individual.name}
-                  onChange={(e) => handleInputChange(e, "individual")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* --- MOVED UP --- */}
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="phone"
-              >
-                Phone Number
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaPhone className="text-gray-500 mr-2" />
-                <input
-                  id="phone"
-                  type="tel"
-                  value={formData.individual.phone}
-                  onChange={(e) => handleInputChange(e, "individual")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your phone number"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="email"
-              >
-                Email Address
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaEnvelope className="text-gray-500 mr-2" />
-                <input
-                  id="email"
-                  type="email"
-                  value={formData.individual.email}
-                  onChange={(e) => handleInputChange(e, "individual")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your email address"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* --- CHANGED TO PIN --- */}
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="pin"
-              >
-                PIN Code
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaLock className="text-gray-500 mr-2" />
-                <input
-                  id="pin"
-                  type="password"
-                  value={formData.individual.pin}
-                  onChange={(e) => handleInputChange(e, "individual")}
-                  className="w-full focus:outline-none"
-                  placeholder="Create a password"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* --- CHANGED TO PIN --- */}
-            <div className="mb-6">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="confirmPin"
-              >
-                Confirm PIN Code
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaLock className="text-gray-500 mr-2" />
-                <input
-                  id="confirmPin"
-                  type="password"
-                  value={formData.individual.confirmPin}
-                  onChange={(e) => handleInputChange(e, "individual")}
-                  className="w-full focus:outline-none"
-                  placeholder="Confirm your password"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="aadhaar"
-              >
-                Aadhaar ID
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaIdCard className="text-gray-500 mr-2" />
-                <input
-                  id="aadhaar"
-                  type="text"
-                  value={formData.individual.aadhaar}
-                  onChange={(e) => handleInputChange(e, "individual")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your Aadhaar ID"
-                  required
-                />
-              </div>
-            </div>
+            {createInput("name", "text", "Enter your full name", User)}
+            {createInput("phone", "tel", "Enter your phone number", Phone)}
+            {createInput("email", "email", "Enter your email address", Mail)}
+            {createInput("pin", "password", "Create a PIN Code", Lock)}
+            {createInput("confirmPin", "password", "Confirm PIN Code", Lock)}
+            {createInput(
+              "aadhaar",
+              "text",
+              "Enter your Aadhaar ID",
+              CreditCard,
+            )}
           </>
         );
       case "issuer":
-        // Static UI preserved for Issuer
         return (
           <>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="issuerId"
-              >
-                Issuer ID
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaIdCard className="text-gray-500 mr-2" />
-                <input
-                  id="issuerId"
-                  type="text"
-                  value={formData.issuer.issuerId}
-                  onChange={(e) => handleInputChange(e, "issuer")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your unique Issuer ID"
-                />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="name"
-              >
-                Name
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaUser className="text-gray-500 mr-2" />
-                <input
-                  id="name"
-                  type="text"
-                  value={formData.issuer.name}
-                  onChange={(e) => handleInputChange(e, "issuer")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your full name"
-                />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="email"
-              >
-                Email
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaEnvelope className="text-gray-500 mr-2" />
-                <input
-                  id="email"
-                  type="email"
-                  value={formData.issuer.email}
-                  onChange={(e) => handleInputChange(e, "issuer")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your email"
-                />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="password"
-              >
-                Password
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaLock className="text-gray-500 mr-2" />
-                <input
-                  id="password"
-                  type="password"
-                  value={formData.issuer.password}
-                  onChange={(e) => handleInputChange(e, "issuer")}
-                  className="w-full focus:outline-none"
-                  placeholder="Create your password"
-                />
-              </div>
-            </div>
-            <div className="mb-6">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="confirmPassword"
-              >
-                Confirm Password
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaLock className="text-gray-500 mr-2" />
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  value={formData.issuer.confirmPassword}
-                  onChange={(e) => handleInputChange(e, "issuer")}
-                  className="w-full focus:outline-none"
-                  placeholder="Confirm your password"
-                />
-              </div>
-            </div>
+            {createInput(
+              "issuerId",
+              "text",
+              "Enter your unique Issuer ID",
+              Building,
+            )}
+            {createInput("name", "text", "Enter issuer name", User)}
+            {createInput("email", "email", "Enter issuer email", Mail)}
+            {createInput("password", "password", "Create a password", Key)}
+            {createInput(
+              "confirmPassword",
+              "password",
+              "Confirm password",
+              Key,
+            )}
           </>
         );
       case "verifier":
-        // Static UI preserved for Verifier
         return (
           <>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="verifierId"
-              >
-                Verifier ID
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaIdCard className="text-gray-500 mr-2" />
-                <input
-                  id="verifierId"
-                  type="text"
-                  value={formData.verifier.verifierId}
-                  onChange={(e) => handleInputChange(e, "verifier")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your unique Verifier ID"
-                />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="name"
-              >
-                Name
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaUser className="text-gray-500 mr-2" />
-                <input
-                  id="name"
-                  type="text"
-                  value={formData.verifier.name}
-                  onChange={(e) => handleInputChange(e, "verifier")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your full name"
-                />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="email"
-              >
-                Email
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaEnvelope className="text-gray-500 mr-2" />
-                <input
-                  id="email"
-                  type="email"
-                  value={formData.verifier.email}
-                  onChange={(e) => handleInputChange(e, "verifier")}
-                  className="w-full focus:outline-none"
-                  placeholder="Enter your email"
-                />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="password"
-              >
-                Password
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaLock className="text-gray-500 mr-2" />
-                <input
-                  id="password"
-                  type="password"
-                  value={formData.verifier.password}
-                  onChange={(e) => handleInputChange(e, "verifier")}
-                  className="w-full focus:outline-none"
-                  placeholder="Create your password"
-                />
-              </div>
-            </div>
-            <div className="mb-6">
-              <label
-                className="block text-gray-700 text-sm font-bold mb-2"
-                htmlFor="confirmPassword"
-              >
-                Confirm Password
-              </label>
-              <div className="flex items-center border rounded-lg px-3 py-2">
-                <FaLock className="text-gray-500 mr-2" />
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  value={formData.verifier.confirmPassword}
-                  onChange={(e) => handleInputChange(e, "verifier")}
-                  className="w-full focus:outline-none"
-                  placeholder="Confirm your password"
-                />
-              </div>
-            </div>
+            {createInput(
+              "verifierId",
+              "text",
+              "Enter your unique Verifier ID",
+              ShieldCheck,
+            )}
+            {createInput("name", "text", "Enter verifier name", User)}
+            {createInput("email", "email", "Enter verifier email", Mail)}
+            {createInput("password", "password", "Create a password", Key)}
+            {createInput(
+              "confirmPassword",
+              "password",
+              "Confirm password",
+              Key,
+            )}
           </>
         );
       default:
@@ -515,9 +305,9 @@ const SignUp = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
       <Navbar />
-      <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md mt-20">
-        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
-          Sign Up - Document Verification System
+      <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-2xl mt-24 transform transition-all duration-300 hover:shadow-xl">
+        <h2 className="text-3xl font-extrabold text-center mb-6 text-gray-900 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+          Secure Registration
         </h2>
         <div className="mb-4">
           <label
@@ -530,7 +320,7 @@ const SignUp = () => {
             id="role"
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="w-full p-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 transition-shadow appearance-none"
           >
             <option value="individual">Individual</option>
             <option value="issuer">Issuing Authority</option>
@@ -540,40 +330,44 @@ const SignUp = () => {
 
         {/* Status Messages */}
         {successMessage && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm font-medium animate-fadeIn">
             {successMessage}
           </div>
         )}
         {errorMessage && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm font-medium animate-fadeIn">
             {errorMessage}
           </div>
         )}
 
         <form onSubmit={handleAuthSubmit}>
           {renderInputs()}
-          <div className="flex items-center justify-between mt-6">
+          <div className="flex items-center justify-between mt-8">
             <button
               type="submit"
-              className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center shadow-lg"
               disabled={isLoading}
             >
               {isLoading ? (
                 <>
-                  <FaSpinner className="animate-spin mr-2" /> Registering...
+                  <Loader className="animate-spin mr-2 h-5 w-5" /> Processing...
                 </>
               ) : (
                 <>
-                  <FaUserPlus className="mr-2" /> Sign Up
+                  <UserPlus className="mr-2 h-5 w-5" /> Sign Up as{" "}
+                  {role.charAt(0).toUpperCase() + role.slice(1)}
                 </>
               )}
             </button>
           </div>
         </form>
-        <div className="text-center mt-4">
+        <div className="text-center mt-6">
           <p className="text-sm text-gray-600">
             Already have an account?{" "}
-            <Link to="/login" className="text-blue-500 hover:underline">
+            <Link
+              to="/login"
+              className="text-blue-600 hover:text-blue-800 font-semibold transition-colors"
+            >
               Log In
             </Link>
           </p>

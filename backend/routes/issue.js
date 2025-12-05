@@ -1,16 +1,16 @@
 import { Router } from "express";
 import {
-  // FIX: Changed 'issueDocument' to 'issueCertificate'
-  // to match the function name in your controller file.
   issueCertificate,
+  getAllRequests,
 } from "../controllers/issueController.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
-// FIX: Changed the route path from '/issuedoc' to '/issue' to match server.js
-// and changed 'issueDocument' to 'issueCertificate'.
-router.post("/issue", issueCertificate);
+// ✅ Protect issuer routes with authentication
+router.post("/issue", authMiddleware, issueCertificate);
 
-// router.get("/getrequests", getRequestedDocs); // This is correctly commented out
+// (Optional) Route for issuers to fetch all pending requests
+router.get("/allrequests", authMiddleware, getAllRequests);
 
 export default router;

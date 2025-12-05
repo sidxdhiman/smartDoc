@@ -1,34 +1,48 @@
 import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
 /**
- * This middleware protects routes.
- * It verifies the JWT token from the Authorization header
- * and attaches the user's ID to the request object (req.userId).
+ * Middleware to protect routes.
+ * Verifies JWT from the Authorization header,
+ * finds the user in MongoDB,
+ * and attaches the full user document to req.user.
  */
 export const authMiddleware = async (req, res, next) => {
-  let token; // 1. Check for the authorization header
+  try {
+    const authHeader = req.headers.authorization;
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    try {
-      // Get token from header (e.g., "Bearer eyJhbGci...")
-      token = req.headers.authorization.split(" ")[1]; // Verify the token using your private key (from environment variables)
-
-      const decoded = jwt.verify(token, process.env.PRIVATE_KEY); // Attach the user's ID to the request object
-
-      req.userId = decoded.id; // Move to the next function in the chain (the controller)
-
-      next();
-    } catch (error) {
-      console.error("Token verification failed:", error.message); // Token is invalid (expired, wrong signature, etc.)
-      return res.status(401).json({ message: "Not authorized, token failed" });
+    // 🔐 1. Check for token presence
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res
+        .status(401)
+        .json({ message: "Not authorized, no token provided" });
     }
-  } else {
-    // If authorization header is missing or not in "Bearer token" format
-    return res
-      .status(401)
-      .json({ message: "Not authorized, no token provided" });
+
+    // 🧩 2. Extract token
+    const token = authHeader.split(" ")[1];
+
+    // 🧾 3. Verify token using the same key used when signing (PRIVATE_KEY)
+    const decoded = jwt.verify(token, process.env.PRIVATE_KEY);
+
+    if (!decoded?.id) {
+      return res.status(401).json({ message: "Invalid token payload" });
+    }
+
+    // 🧍 4. Fetch full user from database (minus password)
+    const user = await User.findById(decoded.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // ✅ 5. Attach user object to the request for downstream controllers
+    req.user = user;
+    console.log("Authenticated user:", req.user.email, req.user.role);
+
+    // Proceed to next middleware/controller
+    next();
+  } catch (error) {
+    console.error("Auth Middleware Error:", error.message);
+    return res.status(401).json({ message: "Not authorized, token invalid" });
   }
 };
