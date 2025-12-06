@@ -9,6 +9,7 @@ import verifyRoute from "./routes/verify.js";
 import requestRoute from "./routes/request.js";
 import issueRoute from "./routes/issue.js";
 import authRoute from "./routes/auth.js"; // Added your auth route
+import userRoutes from "./routes/userRoutes.js";
 
 // 3. --- Environment Variable Check ---
 const requiredEnvVars = ["PORT", "MONGO_URI", "FRONTEND_URL", "PRIVATE_KEY"];
@@ -65,6 +66,8 @@ app.use("/api", authRoute); // Ensure auth routes are used
 app.get("/", (req, res) => {
   res.send("SmartDoc Backend API is running.");
 });
+
+app.use("/api/user", userRoutes);
 
 // 8. --- Connect to DB THEN Start Server ---
 const startServer = async () => {

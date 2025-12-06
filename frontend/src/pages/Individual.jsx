@@ -34,48 +34,54 @@ const Dashboard = () => {
   }, [navigate]);
 
   // ✅ Fetch profile & my requests
-  useEffect(() => {
-    if (!currentUser || currentUser.name) {
-      if (currentUser && currentUser.name) setIsLoading(false);
-      return;
-    }
+  const fetchData = async () => {
+    if (!currentUser?.token) return;
 
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const token = currentUser.token;
+    try {
+      setIsLoading(true);
+      setError(null);
+      const token = currentUser.token;
 
-        const profileResponse = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/user/profile`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+      const profileResponse = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/profile`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
 
-        const profileData = profileResponse.data;
+      const profileData = profileResponse.data;
 
-        const docsResponse = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/myrequests`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+      const docsResponse = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/myrequests`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
 
-        setDocuments(docsResponse.data.requests || []);
-        setCurrentUser({ ...profileData, token });
-        setIsLoading(false);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError(err);
-        setIsLoading(false);
+      setDocuments(docsResponse.data.requests || []);
+      setCurrentUser({ ...profileData, token });
+      setIsLoading(false);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError(err);
+      setIsLoading(false);
 
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          setError({ message: "Session expired. Please log in again." });
-          localStorage.removeItem("smartdoc_user");
-          setTimeout(() => navigate("/login"), 2000);
-        }
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setError({ message: "Session expired. Please log in again." });
+        localStorage.removeItem("smartdoc_user");
+        setTimeout(() => navigate("/login"), 2000);
       }
-    };
+    }
+  };
 
+  useEffect(() => {
     fetchData();
   }, [currentUser, navigate]);
+
+  // ✅ NEW: Auto-refresh every 5 seconds to show latest verification status
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(() => {
+      fetchData();
+    }, 5000); // every 5 seconds
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   // ✅ NEW: Function to send a document request
   const handleSendRequest = async () => {
@@ -83,7 +89,6 @@ const Dashboard = () => {
       const token = currentUser?.token;
       if (!token) return alert("You must be logged in!");
 
-      // For testing, hardcode a request
       const payload = {
         name: currentUser.name,
         phone: currentUser.phone || "9876543210",
@@ -101,6 +106,7 @@ const Dashboard = () => {
 
       alert("✅ Request sent successfully!");
       console.log("Request response:", res.data);
+      fetchData(); // Refresh after sending
     } catch (err) {
       console.error("❌ Error sending request:", err);
       alert("Failed to send request. Check console.");

@@ -6,8 +6,6 @@ import {
   BarChart2,
   Users,
   Zap,
-  Shield,
-  ChevronRight,
   Clock,
   CheckCircle,
   XCircle,
@@ -29,9 +27,9 @@ import AnalyticsPage from "./VerifierComponents/AnalyticsPage";
 import UsersPage from "./VerifierComponents/UsersPage";
 import AIInsightsPage from "./VerifierComponents/AllInsightsPage";
 
-// API functions
 const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
+// --- API Calls ---
 const verifyDocument = async (requestId) => {
   try {
     const response = await fetch(`${BASE_URL}/api/verifydoc`, {
@@ -57,13 +55,10 @@ const verifyDocument = async (requestId) => {
 const getVerificationRequests = async () => {
   try {
     const response = await fetch(`${BASE_URL}/api/getVerificationReq`);
-  //  console.log(response);
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || "Failed to fetch verification requests");
     }
-
-  //  console.log(response.json());
     return await response.json();
   } catch (error) {
     console.error("Error fetching verification requests:", error);
@@ -76,7 +71,7 @@ const DashboardPage = ({ verificationData, onVerify }) => {
   const totalDocs = requests.length;
   const verifiedDocs = requests.filter((r) => r.status === "verified").length;
   const pendingDocs = requests.filter(
-    (r) => !r.status || r.status === "Issued"
+    (r) => !r.status || r.status === "Issued",
   ).length;
   const rejectedDocs = requests.filter((r) => r.status === "rejected").length;
 
@@ -167,10 +162,10 @@ const DashboardPage = ({ verificationData, onVerify }) => {
                   <span>Verified</span>
                 </div>
                 <span className="font-bold">
-                  {(totalDocs/totalDocs)*100}%
+                  {(totalDocs / totalDocs) * 100}%
                 </span>
               </div>
-              <Progress value={(totalDocs/totalDocs)*100} className="h-2" />
+              <Progress value={(totalDocs / totalDocs) * 100} className="h-2" />
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Clock className="h-4 w-4 text-yellow-500" />
@@ -195,6 +190,7 @@ const DashboardPage = ({ verificationData, onVerify }) => {
           </CardContent>
         </Card>
 
+        {/* ✅ Updated Recent Activity Section */}
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-bold">Recent Activity</CardTitle>
@@ -203,29 +199,61 @@ const DashboardPage = ({ verificationData, onVerify }) => {
             <ScrollArea className="h-[300px]">
               <div className="space-y-4">
                 {requests.map((request, index) => (
-                  <div key={index} className="flex items-center space-x-4">
-                    {request.status === "verified" ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : request.status === "rejected" ? (
-                      <XCircle className="h-4 w-4 text-red-500" />
-                    ) : (
-                      <Clock className="h-4 w-4 text-yellow-500" />
-                    )}
-                    <div>
-                      <p className="text-sm font-medium">
-                        {request.documentType}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {request.name}
-                      </p>
+                  <div
+                    key={index}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (typeof onRequestClick === "function") {
+                        onRequestClick(request);
+                      } else if (typeof onVerify === "function") {
+                        onVerify(request._id);
+                      } else {
+                        console.log("Clicked request:", request);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        if (typeof onRequestClick === "function") {
+                          onRequestClick(request);
+                        } else if (typeof onVerify === "function") {
+                          onVerify(request._id);
+                        } else {
+                          console.log("Clicked request:", request);
+                        }
+                      }
+                    }}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <div className="flex items-center space-x-3">
+                      {request.status === "verified" ? (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      ) : request.status === "rejected" ? (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      ) : (
+                        <Clock className="h-4 w-4 text-yellow-500" />
+                      )}
+                      <div>
+                        <p className="text-sm font-medium">
+                          {request.documentType}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {request.name}
+                        </p>
+                        <p className="text-[11px] text-gray-400">
+                          {new Date(request.createdAt).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
+
                     <Badge
                       variant={
                         request.status === "verified"
                           ? "success"
                           : request.status === "rejected"
-                          ? "destructive"
-                          : "warning"
+                            ? "destructive"
+                            : "warning"
                       }
                       className="ml-auto"
                     >
@@ -250,7 +278,7 @@ const DashboardPage = ({ verificationData, onVerify }) => {
             <div className="space-y-4">
               {requests
                 .filter(
-                  (request) => !request.status || request.status === "Issued"
+                  (request) => !request.status || request.status === "Issued",
                 )
                 .map((request, index) => (
                   <div
@@ -309,7 +337,6 @@ const VerificationPage = () => {
   const handleVerifyDocument = async (requestId) => {
     try {
       await verifyDocument(requestId);
-      // Refresh the data after verification
       await fetchVerificationRequests();
     } catch (err) {
       setError(err.message);

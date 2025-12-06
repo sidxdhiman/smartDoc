@@ -119,7 +119,7 @@ const Login = () => {
       if (userDetails.role === "issuer") {
         window.location.href = "/Issuer";
       } else if (userDetails.role === "verifier") {
-        window.location.href = "/verifier-dashboard"; // Example path for verifier
+        window.location.href = "/Verifier"; // Example path for verifier
       } else {
         window.location.href = "/individual";
       }
