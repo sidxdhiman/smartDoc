@@ -1,66 +1,88 @@
 import React, { useState } from "react";
-import { CheckCircle, ExternalLink, FileText } from "lucide-react";
+import { CheckCircle, FileText, Clock, XCircle, Download, ExternalLink } from "lucide-react";
 
-const RecentDocuments = ({ documents }) => {
-  // Filter documents with "Issued" status
-  const verifiedDocuments = documents.filter(
-    (doc) => doc.status === "Verified"
-  );
+const RecentDocuments = ({ documents = [] }) => {
+  // ✅ 1. REMOVED the "Verified Only" filter. 
+  // We want to see ALL documents (Pending, Verified, Issued)
+  
+  // Optional: You can sort them by date if you want
+  const sortedDocs = [...documents].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  // State to manage document preview
   const [selectedDocument, setSelectedDocument] = useState(null);
-
-  // Function to handle document preview
-  const handleDocumentPreview = (doc) => {
-    setSelectedDocument(doc);
-  };
-
-  // Function to close document preview
-  const handleClosePreview = () => {
-    setSelectedDocument(null);
-  };
 
   return (
     <section className="bg-white rounded-2xl shadow-sm p-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-4">
-        Verified Documents
+        My Documents
       </h2>
 
-      {verifiedDocuments.length === 0 ? (
-        <p className="text-gray-500 text-center">
-          No verified documents found.
+      {sortedDocs.length === 0 ? (
+        <p className="text-gray-500 text-center py-4">
+          No documents found. Upload one to get started!
         </p>
       ) : (
         <div className="space-y-4">
-          {verifiedDocuments.map((doc, index) => (
+          {sortedDocs.map((doc, index) => (
             <div
               key={index}
-              className="group flex items-center p-4 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-lg transition-all duration-200"
+              className="group flex items-center p-4 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all duration-200"
             >
+              {/* Icon */}
               <div className="flex-shrink-0 mr-4">
-                <FileText className="w-10 h-10 text-indigo-600" />
+                <div className="bg-indigo-50 p-3 rounded-full">
+                  <FileText className="w-6 h-6 text-indigo-600" />
+                </div>
               </div>
+
+              {/* Main Info */}
               <div className="flex-1">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-gray-900 capitalize">
                     {doc.documentType}
                   </h3>
-                  <div className="flex items-center text-green-600">
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    <span className="text-sm">Verified</span>
+                  
+                  {/* Dynamic Status Badge */}
+                  <div className={`flex items-center text-sm font-medium px-2 py-1 rounded-full ${
+                    doc.status === 'ISSUED' ? 'bg-green-100 text-green-700' :
+                    doc.status === 'VERIFIED' ? 'bg-blue-100 text-blue-700' :
+                    doc.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {doc.status === 'ISSUED' && <CheckCircle className="w-4 h-4 mr-1" />}
+                    {doc.status === 'VERIFIED' && <CheckCircle className="w-4 h-4 mr-1" />}
+                    {doc.status === 'PENDING' && <Clock className="w-4 h-4 mr-1" />}
+                    {doc.status === 'REJECTED' && <XCircle className="w-4 h-4 mr-1" />}
+                    {doc.status}
                   </div>
                 </div>
-                <p className="text-gray-600 mt-1">
-                  Issued by: {doc.issuingAuthority}
+
+                <p className="text-gray-600 mt-1 text-sm">
+                  Issued by: {doc.issuingAuthority || "Pending Authority"}
                 </p>
-                <div className="mt-3 flex space-x-2">
+
+                {/* ✅ ACTION BUTTONS */}
+                <div className="mt-3 flex space-x-3">
+                  
+                  {/* 1. View Details (Metadata) */}
                   <button
-                    onClick={() => handleDocumentPreview(doc)}
-                    className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+                    onClick={() => setSelectedDocument(doc)}
+                    className="flex items-center text-sm text-gray-500 hover:text-indigo-600 transition-colors"
                   >
                     View Details
-                    <ExternalLink className="ml-2 h-4 w-4" />
                   </button>
+
+                  {/* 2. ✅ VIEW CERTIFICATE (Only if ISSUED) */}
+                  {doc.status === "ISSUED" && doc.issuedDocumentUrl && (
+                    <a
+                      href={`${import.meta.env.VITE_BACKEND_URL}/${doc.issuedDocumentUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm shadow-sm"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      View Certificate
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -68,12 +90,12 @@ const RecentDocuments = ({ documents }) => {
         </div>
       )}
 
-      {/* Document Preview Modal */}
+      {/* Details Modal (Preserved your style) */}
       {selectedDocument && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
             <button
-              onClick={handleClosePreview}
+              onClick={() => setSelectedDocument(null)}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
             >
               ✕
@@ -81,55 +103,32 @@ const RecentDocuments = ({ documents }) => {
             <h2 className="text-xl font-bold mb-4 text-indigo-600">
               {selectedDocument.documentType} Details
             </h2>
-            <div className="space-y-3">
+            <div className="space-y-3 text-sm">
               <div>
                 <span className="font-semibold text-gray-700">Name:</span>
                 <p>{selectedDocument.name}</p>
               </div>
               <div>
-                <span className="font-semibold text-gray-700">
-                  Issuing Authority:
-                </span>
-                <p>{selectedDocument.issuingAuthority}</p>
+                <span className="font-semibold text-gray-700">Aadhaar:</span>
+                <p>{selectedDocument.aadhaar}</p>
               </div>
               <div>
-                <span className="font-semibold text-gray-700">IPFS Link:</span>
-                <a
-                  href={
-                    selectedDocument.documentType === "ID Card"
-                      ? "https://copper-gigantic-kite-657.mypinata.cloud/ipfs/bafkreiazvovgsz5ekvxq7vhqdjr7kn3u6drfwbunnje3umwfftldr3qfce"
-                      : `https://copper-gigantic-kite-657.mypinata.cloud/ipfs/${selectedDocument.ipfsHash}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-indigo-600 hover:underline break-all"
-                >
-                  {selectedDocument.documentType === "ID Card"
-                    ? "bafkreiazvovgsz5ekvxq7vhqdjr7kn3u6drfwbunnje3umwfftldr3qfce"
-                    : selectedDocument.ipfsHash}
-                </a>
+                <span className="font-semibold text-gray-700">Status:</span>
+                <p className="capitalize">{selectedDocument.status}</p>
               </div>
-              {selectedDocument.documentType === "Birth Certificate" && (
-                <>
-                  <div>
-                    <span className="font-semibold text-gray-700">
-                      Date of Birth:
-                    </span>
-                    <p>{new Date(selectedDocument.dob).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">
-                      Place of Birth:
-                    </span>
-                    <p>{selectedDocument.placeOfBirth}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">
-                      Registration Number:
-                    </span>
-                    <p>{selectedDocument.registrationNumber}</p>
-                  </div>
-                </>
+              {/* Show file link in modal too if available */}
+              {selectedDocument.issuedDocumentUrl && (
+                 <div className="pt-2">
+                    <span className="font-semibold text-gray-700 block mb-1">Digital Copy:</span>
+                    <a 
+                      href={`${import.meta.env.VITE_BACKEND_URL}/${selectedDocument.issuedDocumentUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 underline break-all"
+                    >
+                      Open Document
+                    </a>
+                 </div>
               )}
             </div>
           </div>

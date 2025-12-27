@@ -1,10 +1,15 @@
-import { Router } from "express";
-import { verifyDocument, getVerificationRequests } from "../controllers/verifyController.js"; // Create the controller for the logic
+import express from "express";
+import { getVerificationRequests, verifyDocument } from "../controllers/verifyController.js";
+import { verifyToken } from "../middleware/auth.js"; 
 
+const router = express.Router();
 
-const router = Router();
+// 1. GET: Fetch all requests (Pending + History)
+// Frontend calls: axios.get('/api/verify/requests')
+router.get("/requests", verifyToken, getVerificationRequests);
 
-router.post("/verifydoc", verifyDocument);
-router.get("/getVerificationReq", getVerificationRequests);
+// 2. POST: Verify a specific document
+// Frontend calls: axios.post('/api/verify/verify', { requestId })
+router.post("/verify", verifyToken, verifyDocument);
 
 export default router;

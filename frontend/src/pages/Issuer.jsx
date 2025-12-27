@@ -7,14 +7,15 @@ import {
   Analytics,
   Settings,
 } from "@/components/IssuerPageComponents";
+import { CheckCircle, Clock, XCircle, FileText } from "lucide-react";
 
-// --- Dashboard Page (Shows Pending Requests + Actions) ---
+// --- Dashboard Page (Split View: To-Do vs History) ---
 const DashboardPage = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ✅ Fetch all document requests for issuer
+  // 1. Fetch ALL requests for the Issuer
   const fetchRequests = async () => {
     try {
       const userJson = localStorage.getItem("smartdoc_user");
@@ -22,7 +23,7 @@ const DashboardPage = () => {
       const { token } = JSON.parse(userJson);
 
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/allrequests`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/issue/requests`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
@@ -35,23 +36,21 @@ const DashboardPage = () => {
     }
   };
 
-  // ✅ Handle Send for Verification or Deny
+  // 2. Handle Issue / Reject
   const handleUpdateStatus = async (id, status) => {
     try {
       const userJson = localStorage.getItem("smartdoc_user");
       if (!userJson) return;
       const { token } = JSON.parse(userJson);
 
-      const res = await axios.patch(
-        `${import.meta.env.VITE_BACKEND_URL}/api/updaterequest`,
-        { requestId: id, newStatus: status },
+      const res = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/issue/issue`,
+        { requestId: id, status: status },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      // Success alert
-      alert(res.data.message || "Status updated successfully!");
-      // Refresh list
-      fetchRequests();
+      alert(res.data.message || "Certificate Issued Successfully!");
+      fetchRequests(); // Refresh the list immediately
     } catch (err) {
       console.error("Error updating request:", err);
       alert("Failed to update request status");
@@ -62,121 +61,122 @@ const DashboardPage = () => {
     fetchRequests();
   }, []);
 
-  // 🌀 Loading state
-  if (loading)
-    return (
-      <div className="p-8 text-gray-600 animate-pulse">Loading requests...</div>
-    );
+  if (loading) return <div className="p-8 text-gray-500 animate-pulse">Loading dashboard...</div>;
+  if (error) return <div className="p-8 text-red-600 bg-red-50 border border-red-200 rounded-lg">{error}</div>;
 
-  // ❌ Error state
-  if (error)
-    return (
-      <div className="p-8 text-red-600 bg-red-100 border border-red-300 rounded">
-        {error}
-      </div>
-    );
+  // ✅ LOGIC: Split the list
+  // "Pending Action" = Status is 'VERIFIED' (Passed by Verifier, waiting for Issuer)
+  // "History" = Status is 'ISSUED' or 'REJECTED'
+  const pendingAction = requests.filter(req => req.status === "VERIFIED");
+  const history = requests.filter(req => req.status === "ISSUED" || req.status === "REJECTED");
 
-  // ✅ UI Rendering
   return (
-    <div className="p-8">
-      <h2 className="text-2xl font-semibold mb-4">
-        📄 Pending Document Requests
-      </h2>
+    <div className="p-8 max-w-7xl mx-auto">
+      
+      {/* SECTION 1: ACTION REQUIRED */}
+      <div className="mb-10">
+        <h2 className="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+          🚀 Ready for Issuance
+          <span className="bg-indigo-100 text-indigo-700 text-sm px-3 py-1 rounded-full">{pendingAction.length}</span>
+        </h2>
 
-      {requests.length === 0 ? (
-        <p className="text-gray-500">No document requests found.</p>
-      ) : (
-        <div className="space-y-4">
-          {requests.map((req) => (
-            <div
-              key={req._id}
-              className="p-5 bg-white shadow-sm border border-gray-200 rounded-xl hover:shadow-md transition-all"
-            >
-              <div className="flex justify-between items-center mb-3">
-                <div>
-                  <p className="font-semibold text-gray-800 text-lg">
-                    {req.name}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {req.documentType} • Aadhaar: {req.aadhaar}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Requested on {new Date(req.createdAt).toLocaleString()}
-                  </p>
+        {pendingAction.length === 0 ? (
+          <div className="p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl text-center text-gray-500">
+            No verified documents waiting for issuance right now.
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {pendingAction.map((req) => (
+              <div key={req._id} className="p-6 bg-white shadow-sm border border-gray-100 border-l-4 border-l-indigo-500 rounded-lg flex flex-col md:flex-row justify-between items-center hover:shadow-md transition-all">
+                <div className="mb-4 md:mb-0">
+                  <h3 className="font-bold text-lg text-gray-900 capitalize">{req.documentType}</h3>
+                  <p className="text-gray-600">Applicant: <span className="font-medium">{req.name}</span></p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="text-sm text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">Aadhaar: {req.aadhaar}</span>
+                    <span className="text-xs font-bold px-2 py-1 bg-blue-50 text-blue-600 rounded flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> VERIFIED
+                    </span>
+                  </div>
                 </div>
-
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    req.status === "Pending"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : req.status === "Verified"
-                        ? "bg-green-100 text-green-700"
-                        : req.status === "Rejected"
-                          ? "bg-red-100 text-red-700"
-                          : req.status === "SentToVerifier"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {req.status}
-                </span>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleUpdateStatus(req._id, "Issued")}
+                    className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-700 shadow-md transition-all font-medium flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Issue Certificate
+                  </button>
+                  <button
+                     onClick={() => handleUpdateStatus(req._id, "Rejected")}
+                     className="text-red-600 px-4 py-2 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Reject
+                  </button>
+                </div>
               </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-              {/* ✅ Show actions only for Pending requests */}
-              {req.status === "Pending" && (
-                <div className="flex gap-4 mt-2">
-                  <button
-                    onClick={() =>
-                      handleUpdateStatus(req._id, "SentToVerifier")
-                    }
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all"
-                  >
-                    Send for Verification
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus(req._id, "Rejected")}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-all"
-                  >
-                    Deny Request
-                  </button>
-                </div>
-              )}
-
-              {/* 🔵 Show note if already processed */}
-              {req.status !== "Pending" && (
-                <p className="text-sm text-gray-500 mt-2 italic">
-                  This request has already been processed.
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {/* SECTION 2: HISTORY */}
+      <div>
+        <h2 className="text-2xl font-bold mb-4 text-gray-800 border-t pt-8">📜 Issuance History</h2>
+        {history.length === 0 ? (
+          <p className="text-gray-500">No issuance history available.</p>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Document</th>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Applicant</th>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {history.map((req) => (
+                  <tr key={req._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 font-medium text-gray-900 capitalize">{req.documentType}</td>
+                    <td className="px-6 py-4 text-gray-600">{req.name}</td>
+                    <td className="px-6 py-4 text-gray-500 text-sm">{new Date(req.updatedAt).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-right">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        req.status === 'ISSUED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {req.status === 'ISSUED' ? <CheckCircle className="w-3 h-3 mr-1"/> : <XCircle className="w-3 h-3 mr-1"/>}
+                        {req.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// --- Main Issuer Dashboard Layout ---
+// --- Main Layout ---
 const IssuerDashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
 
   const renderContent = () => {
     switch (activeTab) {
-      case "templates":
-        return <DocumentTemplates />;
-      case "bulk":
-        return <BulkDocumentIssuance />;
-      case "analytics":
-        return <Analytics />;
-      case "settings":
-        return <Settings />;
-      default:
-        return <DashboardPage />;
+      case "templates": return <DocumentTemplates />;
+      case "bulk": return <BulkDocumentIssuance />;
+      case "analytics": return <Analytics />;
+      case "settings": return <Settings />;
+      default: return <DashboardPage />;
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar
         onHomeClick={() => setActiveTab("dashboard")}
         onTemplatesClick={() => setActiveTab("templates")}

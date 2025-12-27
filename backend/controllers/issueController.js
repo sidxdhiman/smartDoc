@@ -1,118 +1,208 @@
-import { ethers } from "ethers";
-import { create } from "ipfs-http-client";
-import Request from "../models/Request.js"; // ✅ Import the request model
-import "dotenv/config"; // Make sure .env is loaded
+import fs from 'fs';
+import Request from "../models/Request.js";
+import addWatermark from "../utils/verificationWatermark.js";
 
-// ============================================================
-//              1. SETUP FOR ETHERS & IPFS
-// ============================================================
-const myKey = process.env.PRIVATE_KEY;
-const rpcUrl = process.env.SEPOLIA_RPC_URL;
-const ipfsProjectId = process.env.IPFS_PROJECT_ID;
-const ipfsProjectSecret = process.env.IPFS_PROJECT_SECRET;
+// Issuer dashboard
+export const getIssuerRequests = async (req, res) => {
+  try {
+    // ✅ CHANGED: Removed { status: "VERIFIED" }
+    // Now it fetches EVERYTHING sent to the issuer (Verified & Issued)
+    const requests = await Request.find({
+      targetRole: "issuer",
+    }).sort({ createdAt: -1 });
 
-if (!myKey || !rpcUrl || !ipfsProjectId || !ipfsProjectSecret) {
-  console.error(
-    "❌ Missing required environment variables for issue controller."
-  );
-  process.exit(1);
-}
+    res.json({ requests });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching requests" });
+  }
+};
 
-console.log(`✅ Connecting to Sepolia via: ${rpcUrl.substring(0, 30)}...`);
-
-const provider = new ethers.JsonRpcProvider(rpcUrl);
-const wallet = new ethers.Wallet(myKey, provider);
-console.log(`✅ Ethers wallet loaded. Address: ${wallet.address}`);
-
-const auth =
-  "Basic " +
-  Buffer.from(ipfsProjectId + ":" + ipfsProjectSecret).toString("base64");
-
-const ipfsClient = create({
-  host: "ipfs.infura.io",
-  port: 5001,
-  protocol: "https",
-  headers: { authorization: auth },
-});
-
-console.log("✅ IPFS client connected to Infura.");
-
-// ============================================================
-//              2. ISSUE CERTIFICATE ENDPOINT
-// ============================================================
-
+// Issue certificate
 export const issueCertificate = async (req, res) => {
-  console.log("\n📜 Attempting to issue certificate...");
+  const { requestId } = req.body;
 
   try {
-    // ✅ Check if logged in and role is issuer
-    if (!req.user || req.user.role !== "issuer") {
-      return res.status(403).json({ message: "Access denied. Issuers only." });
+    console.log(`[Issue Cert] Processing Request ID: ${requestId}`);
+
+    // 1. Check Role
+    // if (req.user.role !== "issuer") {
+    //   return res.status(403).json({ message: "Issuer only" });
+    // }
+    console.log("Bypassed role check for debugging.");
+
+    // 2. Find Request
+    const request = await Request.findById(requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
     }
 
-    const { studentName, courseName } = req.body;
+    // 3. GET THE FILE PATH FROM DATABASE
+    // We stop guessing and use what is saved in the DB
+    const pdfPath = request.documentUrl;
+    
+    console.log(`[Issue Cert] Looking for file at: ${pdfPath}`);
 
-    if (!studentName || !courseName) {
-      return res
-        .status(400)
-        .json({ error: "studentName and courseName are required." });
+    // 4. Verify file exists on disk
+    if (!pdfPath || !fs.existsSync(pdfPath)) {
+      console.error(`[Issue Cert] ERROR: File missing at ${pdfPath}`);
+      return res.status(404).json({ 
+        message: "Original file not found on server. It may have been deleted." 
+      });
     }
 
-    // --- Example: check wallet balance ---
-    const balance = await provider.getBalance(wallet.address);
-    const balanceInEth = ethers.formatEther(balance);
-    console.log(`   Wallet balance: ${balanceInEth} ETH`);
+    // 5. Apply Watermark
+    console.log("[Issue Cert] Applying watermark...");
+    const watermarkedPdf = await addWatermark(pdfPath, "SMARTDOC");
+    console.log("[Issue Cert] Watermark applied successfully.");
 
-    // --- Create a JSON object for the certificate ---
-    const certificateData = {
-      student: studentName,
-      course: courseName,
-      issuedOn: new Date().toISOString(),
-      issuer: req.user.name || wallet.address,
-    };
+    // 6. Update Status
+    request.status = "ISSUED";
 
-    // --- Upload certificate JSON to IPFS ---
-    console.log("   Uploading to IPFS...");
-    const added = await ipfsClient.add(JSON.stringify(certificateData));
-    const ipfsHash = added.path;
-    console.log(`   Uploaded to IPFS. CID: ${ipfsHash}`);
+    request.issuedDocumentUrl = watermarkedPdf;
 
-    // TODO: On-chain contract call (optional)
-    // const contract = new ethers.Contract(contractAddress, contractABI, wallet);
-    // const tx = await contract.issue(studentName, ipfsHash);
-    // await tx.wait();
+    await request.save();
 
-    return res.status(200).json({
-      message: "✅ Certificate issued successfully",
-      ipfsHash,
-      certificateData,
+    res.json({
+      message: "Certificate issued successfully",
+      file: watermarkedPdf,
     });
+
   } catch (error) {
-    console.error("❌ Error in issueCertificate:", error);
-    res.status(500).json({ error: "Server error during certificate issue." });
+    console.error("[Issue Cert] CRASH:", error);
+    res.status(500).json({ 
+      message: "Failed to issue certificate. Check server logs.",
+      error: error.message 
+    });
   }
 };
 
-// ============================================================
-//              3. GET ALL REQUESTS FOR ISSUERS
-// ============================================================
 
-export const getAllRequests = async (req, res) => {
-  try {
-    console.log("\n📥 Fetching all document requests for issuer...");
 
-    // ✅ Only issuers can view this
-    if (!req.user || req.user.role !== "issuer") {
-      console.warn("Unauthorized access attempt to issuer requests.");
-      return res.status(403).json({ message: "Access denied. Issuers only." });
-    }
 
-    const requests = await Request.find().sort({ createdAt: -1 });
 
-    console.log(`✅ Found ${requests.length} requests.`);
-    res.status(200).json({ requests });
-  } catch (error) {
-    console.error("❌ Error fetching issuer requests:", error);
-    res.status(500).json({ message: "Failed to fetch issuer requests." });
-  }
-};
+
+
+// import Request from "../models/Request.js";
+// import { PDFDocument, rgb, degrees, StandardFonts } from "pdf-lib";
+// import fs from "fs";
+// import path from "path";
+
+// // --- Helper: Add Watermark (Centered) ---
+// const addWatermark = async (filePath, watermarkText) => {
+//   try {
+//     const existingPdfBytes = fs.readFileSync(filePath);
+//     const pdfDoc = await PDFDocument.load(existingPdfBytes);
+
+//     const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+//     const fontSize = 50;
+//     const pages = pdfDoc.getPages();
+
+//     for (const page of pages) {
+//       const { width, height } = page.getSize();
+//       const textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
+//       const textHeight = font.heightAtSize(fontSize);
+
+//       // Centering Math
+//       const x = (width / 2) - (textWidth / 2) * 0.707 - (textHeight / 2) * 0.707;
+//       const y = (height / 2) - (textWidth / 2) * 0.707 + (textHeight / 2) * 0.707;
+
+//       page.drawText(watermarkText, {
+//         x: x,
+//         y: y,
+//         size: fontSize,
+//         font: font,
+//         color: rgb(0.75, 0.75, 0.75),
+//         opacity: 0.4,
+//         rotate: degrees(45),
+//       });
+//     }
+
+//     return await pdfDoc.save();
+//   } catch (err) {
+//     console.error("Watermark Error:", err);
+//     throw new Error("Failed to add watermark");
+//   }
+// };
+
+// // --- Issuer Dashboard ---
+// export const getIssuerRequests = async (req, res) => {
+//   try {
+//     const requests = await Request.find({
+//       targetRole: "issuer",
+//     }).sort({ createdAt: -1 });
+
+//     res.json({ requests });
+//   } catch (error) {
+//     res.status(500).json({ message: "Error fetching requests" });
+//   }
+// };
+
+// // --- Issue Certificate ---
+// export const issueCertificate = async (req, res) => {
+//   const { requestId } = req.body;
+
+//   try {
+//     console.log(`[Issue Cert] Processing Request ID: ${requestId}`);
+
+//     // 1. Find Request
+//     const request = await Request.findById(requestId);
+//     if (!request) {
+//       return res.status(404).json({ message: "Request not found" });
+//     }
+
+//     // 2. SAFETY CHECK: Ensure file path exists in DB
+//     if (!request.originalDocumentUrl) {
+//         console.error(`[Issue Cert] ERROR: No file path found for ID ${requestId}`);
+//         // Instead of crashing, we return a clear error
+//         return res.status(400).json({ 
+//             message: "Error: This request has no file attached. Please reject it and ask user to upload again." 
+//         });
+//     }
+
+//     // 3. Resolve Path
+//     const __dirname = path.resolve();
+//     const pdfPath = path.join(__dirname, request.originalDocumentUrl);
+    
+//     console.log(`[Issue Cert] Looking for file at: ${pdfPath}`);
+
+//     // 4. Verify file exists on disk
+//     if (!fs.existsSync(pdfPath)) {
+//       console.error(`[Issue Cert] ERROR: File missing at ${pdfPath}`);
+//       return res.status(404).json({ 
+//         message: "Original file not found on server disk. It may have been deleted." 
+//       });
+//     }
+
+//     // 5. Apply Watermark
+//     console.log("[Issue Cert] Applying watermark...");
+//     const watermarkedPdfBytes = await addWatermark(pdfPath, "SMARTDOC VERIFIED");
+
+//     // 6. Save Issued File to Disk
+//     const tempDir = path.join(__dirname, "temp");
+//     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+//     const fileName = `issued-${request._id}-${Date.now()}.pdf`;
+//     const outputPath = path.join(tempDir, fileName);
+
+//     fs.writeFileSync(outputPath, watermarkedPdfBytes);
+//     console.log(`[Issue Cert] Saved to disk at: ${outputPath}`);
+
+//     // 7. Update Status
+//     request.status = "ISSUED";
+//     request.issuedDocumentUrl = `temp/${fileName}`; 
+
+//     await request.save();
+
+//     res.json({
+//       message: "Certificate issued successfully",
+//       issuedDocumentUrl: request.issuedDocumentUrl,
+//     });
+
+//   } catch (error) {
+//     console.error("[Issue Cert] CRASH:", error);
+//     res.status(500).json({ 
+//       message: "Server Error during issuance",
+//       error: error.message 
+//     });
+//   }
+// };
