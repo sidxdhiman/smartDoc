@@ -8,6 +8,7 @@ import RecentDocuments from "../components/IndvidualComponents/RecentDocuments";
 import SearchDocuments from "../components/IndvidualComponents/SearchDocuments";
 import Settings from "../components/IndvidualComponents/Settings";
 import AvailableDocuments from "../components/IndvidualComponents/AvailableDocuments";
+import WatermarkedImage from "../components/WatermarkedImage";
 
 const Dashboard = () => {
   const [selectedTab, setSelectedTab] = useState("home");
@@ -38,7 +39,9 @@ const Dashboard = () => {
     if (!currentUser?.token) return;
 
     try {
-      setIsLoading(true);
+      if (documents.length === 0) {
+        setIsLoading(true);
+      }
       setError(null);
       const token = currentUser.token;
 
@@ -71,19 +74,23 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, [currentUser, navigate]);
+    if (currentUser?.token) {
+      fetchData();
+    }
+  }, [currentUser?.token]);
 
-  // ✅ NEW: Auto-refresh every 5 seconds to show latest verification status
+  // ✅ Auto-refresh
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser?.token) return;
+
     const interval = setInterval(() => {
       fetchData();
-    }, 5000); // every 5 seconds
-    return () => clearInterval(interval);
-  }, [currentUser]);
+    }, 5000);
 
-  // ✅ NEW: Function to send a document request
+    return () => clearInterval(interval);
+  }, [currentUser?.token]);
+
+  // ✅ Send request
   const handleSendRequest = async () => {
     try {
       const token = currentUser?.token;
@@ -98,15 +105,14 @@ const Dashboard = () => {
         role: currentUser.role,
       };
 
-      const res = await axios.post(
+      await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/requestdoc`,
         payload,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
       alert("✅ Request sent successfully!");
-      console.log("Request response:", res.data);
-      fetchData(); // Refresh after sending
+      fetchData();
     } catch (err) {
       console.error("❌ Error sending request:", err);
       alert("Failed to send request. Check console.");
@@ -117,6 +123,13 @@ const Dashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem("smartdoc_user");
     navigate("/login");
+  };
+
+  // ✅ IPFS URL resolver (ADDED)
+  const getDocumentUrl = (doc) => {
+    if (doc.gatewayUrls?.length) return doc.gatewayUrls[0];
+    if (doc.ipfsHash) return `https://ipfs.io/ipfs/${doc.ipfsHash}`;
+    return null;
   };
 
   if (isLoading || !currentUser)
@@ -142,18 +155,51 @@ const Dashboard = () => {
             <br />
             <AvailableDocuments />
             <br />
-            {/* ✅ New "Send Request" button */}
+
             <button
               onClick={handleSendRequest}
               className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             >
               Send Document Request
             </button>
+
             <br />
+
             {error ? (
               <div className="text-red-600">{error.message}</div>
             ) : (
-              <RecentDocuments documents={documents} />
+              <>
+                <RecentDocuments documents={documents} />
+
+                {/* ✅ WATERMARKED ISSUED / VERIFIED DOCUMENTS */}
+                {documents
+                  .filter(
+                    (doc) =>
+                      (doc.status === "ISSUED" || doc.status === "VERIFIED") &&
+                      (doc.gatewayUrls?.length || doc.ipfsHash) &&
+                      doc.mimeType?.startsWith("image"),
+                  )
+                  .map((doc) => {
+                    const url = getDocumentUrl(doc);
+                    if (!url) return null;
+
+                    return (
+                      <div
+                        key={doc._id}
+                        className="mt-6 p-4 bg-white rounded-lg shadow"
+                      >
+                        <p className="font-semibold mb-2">
+                          {doc.title} ({doc.status})
+                        </p>
+
+                        <WatermarkedImage
+                          src={url}
+                          watermarkText="SMARTDOC • VERIFIED"
+                        />
+                      </div>
+                    );
+                  })}
+              </>
             )}
           </>
         )}
