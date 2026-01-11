@@ -1,9 +1,9 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "C:\\Users\\Lenovo\\Documents\\SIH\\smartdoc\\backend\\contracts\\DocumentRegistry.sol": {
-      "lastModificationDate": 1733130302765,
-      "contentHash": "00567fae52d302de224c0eb1aedddf20",
+    "/home/sid/Documents/codes/code_backup/SmartDoc/backend/contracts/DocumentRegistry.sol": {
+      "lastModificationDate": 1763124051554,
+      "contentHash": "7cbef11e14630579456a79fff5e6eb65",
       "sourceName": "contracts/DocumentRegistry.sol",
       "solcConfig": {
         "version": "0.8.19",
